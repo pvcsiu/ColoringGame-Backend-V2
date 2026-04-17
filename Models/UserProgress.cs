@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ColoringGame.API.Models;
 
+[Table("userprogress")] // 👈 THÊM DÒNG NÀY ĐỂ ÉP CỨNG TÊN BẢNG KHÔNG CÓ CHỮ "ES"
 public class UserProgress
 {
     [Key]
