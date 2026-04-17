@@ -13,7 +13,8 @@ RUN dotnet publish "ColoringGame.API.csproj" -c Release -o /app/publish
 # 4. Chuyển sang image Runtime siêu nhẹ để chạy thực tế
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+# ĐÃ SỬA LỖI Ở DÒNG NÀY: Copy từ bước 'build' thay vì 'publish'
+COPY --from=build /app/publish .
 
 # 5. Cấu hình cổng mạng cho Render
 EXPOSE 8080
