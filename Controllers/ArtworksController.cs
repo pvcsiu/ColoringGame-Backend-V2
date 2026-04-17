@@ -49,7 +49,7 @@ public class ArtworksController : ControllerBase
         using (var stream = new FileStream(Path.Combine(uploadsFolder, thumbFileName), FileMode.Create)) await thumbFile.CopyToAsync(stream);
 
         // Tự động lấy URL của Render
-        var serverUrl = $"{Request.Scheme}://{Request.Host}";
+        var serverUrl = $"https://{Request.Host}";
 
         var artwork = new Artwork {
             Title = title, TotalColors = totalColors, TotalRegions = totalRegions,
@@ -80,22 +80,37 @@ public class ArtworksController : ControllerBase
     [HttpPost("delete")]
     public async Task<IActionResult> DeleteArtworks([FromBody] List<int> artworkIds)
     {
-        var artworks = await _context.Artworks.Where(a => artworkIds.Contains(a.ArtworkId)).ToListAsync();
-        var progresses = await _context.UserProgresses.Where(p => artworkIds.Contains(p.ArtworkId)).ToListAsync();
-        var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
-
-        foreach (var art in artworks)
+        try 
         {
-            var dataPath = Path.Combine(uploadsFolder, Path.GetFileName(new Uri(art.DataUrl).LocalPath));
-            var thumbPath = Path.Combine(uploadsFolder, Path.GetFileName(new Uri(art.ThumbnailUrl).LocalPath));
-            if (System.IO.File.Exists(dataPath)) System.IO.File.Delete(dataPath);
-            if (System.IO.File.Exists(thumbPath)) System.IO.File.Delete(thumbPath);
+            var artworks = await _context.Artworks.Where(a => artworkIds.Contains(a.ArtworkId)).ToListAsync();
+            var progresses = await _context.UserProgresses.Where(p => artworkIds.Contains(p.ArtworkId)).ToListAsync();
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+
+            // BỌC TRY-CATCH: Lỡ file trên Render bị mất, Server vẫn không bị sập!
+            foreach (var art in artworks)
+            {
+                try {
+                    if (!string.IsNullOrEmpty(art.DataUrl)) {
+                        var dataPath = Path.Combine(uploadsFolder, Path.GetFileName(new Uri(art.DataUrl).LocalPath));
+                        if (System.IO.File.Exists(dataPath)) System.IO.File.Delete(dataPath);
+                    }
+                    if (!string.IsNullOrEmpty(art.ThumbnailUrl)) {
+                        var thumbPath = Path.Combine(uploadsFolder, Path.GetFileName(new Uri(art.ThumbnailUrl).LocalPath));
+                        if (System.IO.File.Exists(thumbPath)) System.IO.File.Delete(thumbPath);
+                    }
+                } catch { /* Im lặng bỏ qua lỗi xóa file vật lý */ }
+            }
+
+            _context.UserProgresses.RemoveRange(progresses);
+            _context.Artworks.RemoveRange(artworks);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = $"Đã xóa thành công {artworks.Count} bức tranh!" });
         }
-
-        _context.UserProgresses.RemoveRange(progresses);
-        _context.Artworks.RemoveRange(artworks);
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = $"Đã xóa {artworks.Count} bức tranh!" });
+        catch (Exception ex)
+        {
+            Console.WriteLine("CRITICAL DELETE ERROR: " + ex.Message);
+            return StatusCode(500, new { message = "Lỗi Server khi xóa: " + ex.Message });
+        }
     }
 }
